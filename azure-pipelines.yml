@@ -15,7 +15,7 @@ resources:
   repositories:
 
     # =========================================
-    # JAVA MAVEN APPLICATION REPOSITORY
+    # JAVA APPLICATION REPOSITORY
     # =========================================
 
     - repository: JavaRepo
@@ -115,8 +115,8 @@ stages:
       displayName: Copy WAR File
 
       inputs:
-        SourceFolder: '$(System.DefaultWorkingDirectory)'
-        Contents: '**/*.war'
+        SourceFolder: '$(System.DefaultWorkingDirectory)/target'
+        Contents: '*.war'
         TargetFolder: '$(Build.ArtifactStagingDirectory)'
 
     # Display Artifact Files
@@ -159,7 +159,7 @@ stages:
           - download: current
             artifact: warfile
 
-          # Display Downloaded Artifact Files
+          # Display Downloaded Artifacts
           - script: |
               echo "Downloaded Artifact Files"
               ls -R $(Pipeline.Workspace)
@@ -173,7 +173,7 @@ stages:
               azureSubscription: $(azureSubscription)
               appType: webAppLinux
               appName: $(webAppName)
-              package: '$(Pipeline.Workspace)/warfile/**/*.war'
+              package: '$(Pipeline.Workspace)/warfile/*.war'
 
 # =====================================================
 # SELENIUM REGRESSION AUTOMATION STAGE
@@ -257,7 +257,7 @@ stages:
       inputs:
         versionSpec: '18.x'
 
-    # Verify Node and NPM
+    # Verify Node.js and NPM
     - script: |
         node -v
         npm -v
@@ -281,7 +281,7 @@ stages:
       workingDirectory: '$(Build.SourcesDirectory)/PlaywrightInit.git'
       displayName: Run Playwright Tests
 
-    # Publish Playwright Report
+    # Publish Playwright HTML Report
     - task: PublishPipelineArtifact@1
       displayName: Publish Playwright Report
 
@@ -337,5 +337,5 @@ stages:
               azureSubscription: 'Azure subscription 1 (6f6373fe-b7a1-4a65-b9b5-2ef633e1fcc9)'
               appType: 'webAppLinux'
               WebAppName: 'prodganesh'
-              packageForLinux: '$(Pipeline.Workspace)/warfile/**/*.war'
+              packageForLinux: '$(Pipeline.Workspace)/warfile/*.war'
               DeploymentTypeLinux: 'oneDeploy'
