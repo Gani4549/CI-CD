@@ -1,31 +1,236 @@
-# Maven
-# Build your Java project and run tests with Apache Maven.
-# Add steps that analyze code, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/java
-
 trigger:
 - master
 
-pool:
-  vmImage: ubuntu-latest
+variables:
 
-steps:
-- task: Maven@3
-  inputs:
-    mavenPomFile: 'pom.xml'
-    mavenOptions: '-Xmx3072m'
-    javaHomeOption: 'JDKVersion'
-    jdkVersionOption: '1.8'
-    jdkArchitectureOption: 'x64'
-    publishJUnitResults: true
-    testResultsFiles: '**/surefire-reports/TEST-*.xml'
-    goals: 'package'
-- task: CopyFiles@2
-  inputs:
-    Contents: '**/*.war'
-    TargetFolder: '$(build.artifactstagingdirectory)'
-- task: PublishBuildArtifacts@1
-  inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    ArtifactName: 'warfile'
-    publishLocation: 'Container'
+  # =========================================
+  # QA / TEST ENVIRONMENT
+  # =========================================
+
+  azureSubscription: 'ca8cbce7-1314-49cb-8f4e-db8b3db5a802'
+  webAppName: 'Ganesh'
+  environmentName: 'Ganesh'
+
+  # =========================================
+  # PRODUCTION ENVIRONMENT
+  # =========================================
+
+  productionWebAppName: 'prodganesh'
+  productionEnvironmentName: 'Production'
+
+  # =========================================
+  # AGENT
+  # =========================================
+
+  vmImageName: 'ubuntu-latest'
+
+# =========================================
+# STAGES
+# =========================================
+
+stages:
+
+# =========================================
+# BUILD STAGE
+# =========================================
+
+- stage: Build
+  displayName: Build Stage
+
+  jobs:
+
+  - job: BuildJob
+    displayName: Maven Build Job
+
+    pool:
+      vmImage: $(vmImageName)
+
+    steps:
+
+    # Checkout Repository
+    - checkout: self
+
+    # Display Repository Files
+    - script: |
+        echo "Source Directory"
+        pwd
+
+        echo "All Repository Files"
+        ls -R
+      displayName: Display Repository Files
+
+    # Maven Build
+    - task: Maven@4
+      displayName: Maven Package
+
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean package -DskipTests'
+        publishJUnitResults: false
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.8'
+        jdkArchitectureOption: 'x64'
+
+    # Verify WAR File
+    - script: |
+        echo "WAR Files"
+        find . -name "*.war"
+      displayName: Find WAR File
+
+    # Copy WAR File
+    - task: CopyFiles@2
+      displayName: Copy WAR File
+
+      inputs:
+        SourceFolder: '$(System.DefaultWorkingDirectory)'
+        Contents: '**/*.war'
+        TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+    # Display Artifact Files
+    - script: |
+        echo "Artifact Files"
+        ls -R $(Build.ArtifactStagingDirectory)
+      displayName: Display Artifact Files
+
+    # Publish Artifact
+    - publish: $(Build.ArtifactStagingDirectory)
+      artifact: warfile
+
+# =========================================
+# QA DEPLOYMENT STAGE
+# =========================================
+
+- stage: Deploy
+  displayName: QA Deployment Stage
+
+  dependsOn: Build
+  condition: succeeded()
+
+  jobs:
+
+  - deployment: DeployToQA
+    displayName: Deploy To QA Server
+
+    environment: $(environmentName)
+
+    pool:
+      vmImage: $(vmImageName)
+
+    strategy:
+      runOnce:
+        deploy:
+
+          steps:
+
+          # Download Artifact
+          - download: current
+            artifact: warfile
+
+          # Display Downloaded Artifact
+          - script: |
+              echo "Downloaded Artifact Files"
+              ls -R $(Pipeline.Workspace)
+            displayName: Display Downloaded Artifacts
+
+          # Deploy To QA Azure Web App
+          - task: AzureWebApp@1
+            displayName: Deploy WAR To QA Web App
+
+            inputs:
+              azureSubscription: $(azureSubscription)
+              appType: webAppLinux
+              appName: $(webAppName)
+              package: '$(Pipeline.Workspace)/warfile/**/*.war'
+
+# =========================================
+# AUTOMATION TEST STAGE
+# =========================================
+
+- stage: AutomationTests
+  displayName: Automation Test Stage
+
+  dependsOn: Deploy
+  condition: succeeded()
+
+  jobs:
+
+  - job: RunAutomationTests
+    displayName: Run Selenium Tests
+
+    pool:
+      vmImage: $(vmImageName)
+
+    steps:
+
+    # Checkout Repository
+    - checkout: self
+
+    # Run Maven Tests
+    - task: Maven@4
+      displayName: Run Maven Tests
+
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean test'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.8'
+        jdkArchitectureOption: 'x64'
+
+    # Publish Test Results
+    - task: PublishTestResults@2
+      displayName: Publish Test Results
+
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        failTaskOnFailedTests: true
+
+# =========================================
+# PRODUCTION DEPLOYMENT STAGE
+# =========================================
+
+- stage: Production
+  displayName: Production Deployment Stage
+
+  dependsOn: AutomationTests
+  condition: succeeded()
+
+  jobs:
+
+  - deployment: DeployToProduction
+    displayName: Deploy To Production Server
+
+    environment: $(productionEnvironmentName)
+
+    pool:
+      vmImage: $(vmImageName)
+
+    strategy:
+      runOnce:
+        deploy:
+
+          steps:
+
+          # Download Artifact
+          - download: current
+            artifact: warfile
+
+          # Display Production Artifact
+          - script: |
+              echo "Production Artifact Files"
+              ls -R $(Pipeline.Workspace)
+            displayName: Display Production Files
+
+          # Deploy To Production Azure Web App
+          - task: AzureRmWebAppDeployment@5
+            displayName: Deploy WAR To Production Web App
+
+            inputs:
+              ConnectionType: 'AzureRM'
+              azureSubscription: 'Azure subscription 1 (6f6373fe-b7a1-4a65-b9b5-2ef633e1fcc9)'
+              appType: 'webAppLinux'
+              WebAppName: 'prodganesh'
+              packageForLinux: '$(Pipeline.Workspace)/warfile/**/*.war'
+              DeploymentTypeLinux: 'oneDeploy'
