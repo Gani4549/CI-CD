@@ -1,10 +1,43 @@
+# =====================================================
+# COMPLETE MODERN YAML CI/CD PIPELINE
+# Java Maven + Selenium + Playwright + Production
+# Azure DevOps Multi-Stage Pipeline
+# =====================================================
+
 trigger:
 - master
+
+# =====================================================
+# REPOSITORIES
+# =====================================================
+
+resources:
+  repositories:
+
+    # =========================================
+    # JAVA MAVEN APPLICATION REPOSITORY
+    # =========================================
+
+    - repository: JavaRepo
+      type: git
+      name: AzureDemoGanesh/AzureDemoGanesh
+
+    # =========================================
+    # PLAYWRIGHT AUTOMATION REPOSITORY
+    # =========================================
+
+    - repository: PlaywrightRepo
+      type: git
+      name: AzureDemoGanesh/PlaywrightInit.git
+
+# =====================================================
+# VARIABLES
+# =====================================================
 
 variables:
 
   # =========================================
-  # QA / TEST ENVIRONMENT
+  # QA ENVIRONMENT
   # =========================================
 
   azureSubscription: 'ca8cbce7-1314-49cb-8f4e-db8b3db5a802'
@@ -19,20 +52,20 @@ variables:
   productionEnvironmentName: 'Production'
 
   # =========================================
-  # AGENT
+  # AGENT VM IMAGE
   # =========================================
 
   vmImageName: 'ubuntu-latest'
 
-# =========================================
+# =====================================================
 # STAGES
-# =========================================
+# =====================================================
 
 stages:
 
-# =========================================
+# =====================================================
 # BUILD STAGE
-# =========================================
+# =====================================================
 
 - stage: Build
   displayName: Build Stage
@@ -47,15 +80,15 @@ stages:
 
     steps:
 
-    # Checkout Repository
-    - checkout: self
+    # Checkout Java Repository
+    - checkout: JavaRepo
 
     # Display Repository Files
     - script: |
-        echo "Source Directory"
+        echo "Current Directory"
         pwd
 
-        echo "All Repository Files"
+        echo "Repository Files"
         ls -R
       displayName: Display Repository Files
 
@@ -92,15 +125,15 @@ stages:
         ls -R $(Build.ArtifactStagingDirectory)
       displayName: Display Artifact Files
 
-    # Publish Artifact
+    # Publish WAR Artifact
     - publish: $(Build.ArtifactStagingDirectory)
       artifact: warfile
 
-# =========================================
+# =====================================================
 # QA DEPLOYMENT STAGE
-# =========================================
+# =====================================================
 
-- stage: Deploy
+- stage: DeployQA
   displayName: QA Deployment Stage
 
   dependsOn: Build
@@ -122,17 +155,17 @@ stages:
 
           steps:
 
-          # Download Artifact
+          # Download WAR Artifact
           - download: current
             artifact: warfile
 
-          # Display Downloaded Artifact
+          # Display Downloaded Artifact Files
           - script: |
               echo "Downloaded Artifact Files"
               ls -R $(Pipeline.Workspace)
             displayName: Display Downloaded Artifacts
 
-          # Deploy To QA Azure Web App
+          # Deploy WAR To QA Azure Web App
           - task: AzureWebApp@1
             displayName: Deploy WAR To QA Web App
 
@@ -142,32 +175,32 @@ stages:
               appName: $(webAppName)
               package: '$(Pipeline.Workspace)/warfile/**/*.war'
 
-# =========================================
-# AUTOMATION TEST STAGE
-# =========================================
+# =====================================================
+# SELENIUM REGRESSION AUTOMATION STAGE
+# =====================================================
 
-- stage: AutomationTests
-  displayName: Automation Test Stage
+- stage: RegressionAutomation
+  displayName: Regression Automation Stage
 
-  dependsOn: Deploy
+  dependsOn: DeployQA
   condition: succeeded()
 
   jobs:
 
-  - job: RunAutomationTests
-    displayName: Run Selenium Tests
+  - job: RunRegressionTests
+    displayName: Run Selenium Regression Tests
 
     pool:
       vmImage: $(vmImageName)
 
     steps:
 
-    # Checkout Repository
-    - checkout: self
+    # Checkout Java Repository
+    - checkout: JavaRepo
 
-    # Run Maven Tests
+    # Run Selenium Tests
     - task: Maven@4
-      displayName: Run Maven Tests
+      displayName: Run Selenium Tests
 
       inputs:
         mavenPomFile: 'pom.xml'
@@ -178,23 +211,95 @@ stages:
         jdkVersionOption: '1.8'
         jdkArchitectureOption: 'x64'
 
-    # Publish Test Results
+    # Publish Selenium Test Results
     - task: PublishTestResults@2
-      displayName: Publish Test Results
+      displayName: Publish Selenium Test Results
 
       inputs:
         testResultsFormat: 'JUnit'
         testResultsFiles: '**/surefire-reports/TEST-*.xml'
         failTaskOnFailedTests: true
 
-# =========================================
+# =====================================================
+# PLAYWRIGHT JS TEST STAGE
+# =====================================================
+
+- stage: PlaywrightJS
+  displayName: Playwright JS Stage
+
+  dependsOn: RegressionAutomation
+  condition: succeeded()
+
+  jobs:
+
+  - job: RunPlaywrightTests
+    displayName: Run Playwright JavaScript Tests
+
+    pool:
+      vmImage: $(vmImageName)
+
+    steps:
+
+    # Checkout Playwright Repository
+    - checkout: PlaywrightRepo
+
+    # Display Playwright Repository Files
+    - script: |
+        echo "Playwright Repository Files"
+        pwd
+        ls -R
+      displayName: Display Playwright Files
+
+    # Install Node.js
+    - task: NodeTool@0
+      displayName: Install Node.js
+
+      inputs:
+        versionSpec: '18.x'
+
+    # Verify Node and NPM
+    - script: |
+        node -v
+        npm -v
+      displayName: Check Node Version
+
+    # Install NPM Packages
+    - script: |
+        npm install
+      workingDirectory: '$(Build.SourcesDirectory)/PlaywrightInit.git'
+      displayName: Install NPM Packages
+
+    # Install Playwright Browsers
+    - script: |
+        npx playwright install --with-deps
+      workingDirectory: '$(Build.SourcesDirectory)/PlaywrightInit.git'
+      displayName: Install Playwright Browsers
+
+    # Run Playwright Tests
+    - script: |
+        npx playwright test
+      workingDirectory: '$(Build.SourcesDirectory)/PlaywrightInit.git'
+      displayName: Run Playwright Tests
+
+    # Publish Playwright Report
+    - task: PublishPipelineArtifact@1
+      displayName: Publish Playwright Report
+
+      condition: always()
+
+      inputs:
+        targetPath: '$(Build.SourcesDirectory)/PlaywrightInit.git/playwright-report'
+        artifact: 'playwright-report'
+        publishLocation: 'pipeline'
+
+# =====================================================
 # PRODUCTION DEPLOYMENT STAGE
-# =========================================
+# =====================================================
 
 - stage: Production
   displayName: Production Deployment Stage
 
-  dependsOn: AutomationTests
+  dependsOn: PlaywrightJS
   condition: succeeded()
 
   jobs:
@@ -213,17 +318,17 @@ stages:
 
           steps:
 
-          # Download Artifact
+          # Download WAR Artifact
           - download: current
             artifact: warfile
 
-          # Display Production Artifact
+          # Display Production Artifact Files
           - script: |
               echo "Production Artifact Files"
               ls -R $(Pipeline.Workspace)
             displayName: Display Production Files
 
-          # Deploy To Production Azure Web App
+          # Deploy WAR To Production Azure Web App
           - task: AzureRmWebAppDeployment@5
             displayName: Deploy WAR To Production Web App
 
