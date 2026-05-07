@@ -15,7 +15,7 @@ resources:
   repositories:
 
     # =========================================
-    # JAVA APPLICATION REPOSITORY
+    # JAVA MAVEN APPLICATION REPOSITORY
     # =========================================
 
     - repository: JavaRepo
@@ -92,7 +92,7 @@ stages:
         ls -R
       displayName: Display Repository Files
 
-    # Maven Build
+    # Maven Package
     - task: Maven@4
       displayName: Maven Package
 
@@ -159,7 +159,7 @@ stages:
           - download: current
             artifact: warfile
 
-          # Display Downloaded Artifacts
+          # Display Downloaded Files
           - script: |
               echo "Downloaded Artifact Files"
               ls -R $(Pipeline.Workspace)
@@ -198,6 +198,13 @@ stages:
     # Checkout Java Repository
     - checkout: JavaRepo
 
+    # Display Java Repository Files
+    - script: |
+        echo "Java Repository Files"
+        pwd
+        ls -R
+      displayName: Display Java Repository Files
+
     # Run Selenium Tests
     - task: Maven@4
       displayName: Run Selenium Tests
@@ -211,7 +218,7 @@ stages:
         jdkVersionOption: '1.8'
         jdkArchitectureOption: 'x64'
 
-    # Publish Selenium Test Results
+    # Publish Selenium Results
     - task: PublishTestResults@2
       displayName: Publish Selenium Test Results
 
@@ -233,7 +240,7 @@ stages:
   jobs:
 
   - job: RunPlaywrightTests
-    displayName: Run Playwright JavaScript Tests
+    displayName: Run Playwright Tests
 
     pool:
       vmImage: $(vmImageName)
@@ -243,7 +250,7 @@ stages:
     # Checkout Playwright Repository
     - checkout: PlaywrightRepo
 
-    # Display Playwright Repository Files
+    # Display Playwright Files
     - script: |
         echo "Playwright Repository Files"
         pwd
@@ -263,7 +270,7 @@ stages:
         npm -v
       displayName: Check Node Version
 
-    # Install NPM Packages
+    # Install NPM Dependencies
     - script: |
         npm install
       workingDirectory: '$(Build.SourcesDirectory)/PlaywrightInit.git'
@@ -322,7 +329,7 @@ stages:
           - download: current
             artifact: warfile
 
-          # Display Production Artifact Files
+          # Display Production Files
           - script: |
               echo "Production Artifact Files"
               ls -R $(Pipeline.Workspace)
