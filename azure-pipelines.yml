@@ -115,8 +115,8 @@ stages:
       displayName: Copy WAR File
 
       inputs:
-        SourceFolder: '$(System.DefaultWorkingDirectory)/target'
-        Contents: '*.war'
+        SourceFolder: '$(System.DefaultWorkingDirectory)'
+        Contents: '**/*.war'
         TargetFolder: '$(Build.ArtifactStagingDirectory)'
 
     # Display Artifact Files
@@ -173,7 +173,7 @@ stages:
               azureSubscription: $(azureSubscription)
               appType: webAppLinux
               appName: $(webAppName)
-              package: '$(Pipeline.Workspace)/warfile/*.war'
+              package: '$(Pipeline.Workspace)/warfile/**/*.war'
 
 # =====================================================
 # SELENIUM REGRESSION AUTOMATION STAGE
