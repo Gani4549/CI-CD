@@ -1,6 +1,10 @@
 trigger:
 - master
 
+# =====================================================
+# PLAYWRIGHT REPOSITORY
+# =====================================================
+
 resources:
   repositories:
 
@@ -8,53 +12,75 @@ resources:
       type: git
       name: AzureDemoGanesh/PlaywrightInit.git
 
+# =====================================================
+# PLAYWRIGHT PIPELINE
+# =====================================================
+
 pool:
   vmImage: 'ubuntu-latest'
 
 steps:
 
-# Checkout Playwright Repo
+# =====================================================
+# CHECKOUT PLAYWRIGHT REPOSITORY
+# =====================================================
+
 - checkout: PlaywrightRepo
 
-# Display Repository Structure
+# =====================================================
+# DISPLAY REPOSITORY FILES
+# =====================================================
+
 - script: |
     echo "Current Directory"
     pwd
 
-    echo "Source Directory"
+    echo "Repository Files"
     ls -R $(Build.SourcesDirectory)
   displayName: Display Repository Files
 
-# Install Node.js
+# =====================================================
+# INSTALL NODE.JS
+# =====================================================
+
 - task: NodeTool@0
   displayName: Install Node.js
 
   inputs:
     versionSpec: '18.x'
 
-# Verify Node.js
+# =====================================================
+# VERIFY NODE.JS AND NPM
+# =====================================================
+
 - script: |
     node -v
     npm -v
   displayName: Check Node Version
 
-# Install NPM Packages
+# =====================================================
+# INSTALL NPM PACKAGES
+# =====================================================
+
 - script: |
     cd $(Build.SourcesDirectory)
 
-    echo "Folders:"
+    echo "Available Folders"
     ls
 
     cd *
 
-    echo "Inside Repo:"
+    echo "Inside Repository"
     pwd
     ls
 
     npm install
   displayName: Install NPM Packages
 
-# Install Playwright Browsers
+# =====================================================
+# INSTALL PLAYWRIGHT BROWSERS
+# =====================================================
+
 - script: |
     cd $(Build.SourcesDirectory)
     cd *
@@ -62,7 +88,10 @@ steps:
     npx playwright install --with-deps
   displayName: Install Playwright Browsers
 
-# Run Playwright Tests
+# =====================================================
+# RUN PLAYWRIGHT TESTS
+# =====================================================
+
 - script: |
     cd $(Build.SourcesDirectory)
     cd *
@@ -70,13 +99,29 @@ steps:
     npx playwright test
   displayName: Run Playwright Tests
 
-# Publish Playwright Report
+# =====================================================
+# COPY PLAYWRIGHT REPORT
+# =====================================================
+
+- script: |
+    mkdir -p $(Build.ArtifactStagingDirectory)/playwright-report
+
+    cd $(Build.SourcesDirectory)
+    cd *
+
+    cp -R playwright-report/* $(Build.ArtifactStagingDirectory)/playwright-report
+  displayName: Copy Playwright Report
+
+# =====================================================
+# PUBLISH PLAYWRIGHT REPORT
+# =====================================================
+
 - task: PublishPipelineArtifact@1
   displayName: Publish Playwright Report
 
   condition: always()
 
   inputs:
-    targetPath: '$(Build.SourcesDirectory)/*/playwright-report'
+    targetPath: '$(Build.ArtifactStagingDirectory)/playwright-report'
     artifact: 'playwright-report'
     publishLocation: 'pipeline'
