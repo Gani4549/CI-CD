@@ -1,20 +1,12 @@
 trigger:
 - master
 
-# =====================================================
-# PLAYWRIGHT REPOSITORY
-# =====================================================
-
 resources:
   repositories:
 
     - repository: PlaywrightRepo
       type: git
       name: AzureDemoGanesh/PlaywrightInit.git
-
-# =====================================================
-# PLAYWRIGHT STAGE
-# =====================================================
 
 stages:
 
@@ -31,26 +23,24 @@ stages:
 
     steps:
 
-    # Checkout Playwright Repository
+    # Checkout Playwright Repo
     - checkout: PlaywrightRepo
 
-    # Display Repository Files
+    # Verify Folder Name
     - script: |
-        echo "Current Directory"
+        echo "Repository Files"
         pwd
-
-        echo "Playwright Repository Files"
-        ls -R
-      displayName: Display Playwright Repository Files
+        ls -R $(Build.SourcesDirectory)
+      displayName: Display Repository Files
 
     # Install Node.js
     - task: NodeTool@0
       displayName: Install Node.js
 
       inputs:
-        versionSpec: '22.x'
+        versionSpec: '18.x'
 
-    # Verify Node.js and NPM
+    # Check Node Version
     - script: |
         node -v
         npm -v
@@ -59,28 +49,28 @@ stages:
     # Install NPM Packages
     - script: |
         npm install
-      workingDirectory: '$(Build.SourcesDirectory)/PlaywrightInit.git'
+      workingDirectory: '$(Build.SourcesDirectory)/PlaywrightInit'
       displayName: Install NPM Packages
 
-    # Install Playwright Browsers
+    # Install Browsers
     - script: |
         npx playwright install --with-deps
-      workingDirectory: '$(Build.SourcesDirectory)/PlaywrightInit.git'
+      workingDirectory: '$(Build.SourcesDirectory)/PlaywrightInit'
       displayName: Install Playwright Browsers
 
     # Run Playwright Tests
     - script: |
         npx playwright test
-      workingDirectory: '$(Build.SourcesDirectory)/PlaywrightInit.git'
+      workingDirectory: '$(Build.SourcesDirectory)/PlaywrightInit'
       displayName: Run Playwright Tests
 
-    # Publish Playwright Report
+    # Publish Report
     - task: PublishPipelineArtifact@1
       displayName: Publish Playwright Report
 
       condition: always()
 
       inputs:
-        targetPath: '$(Build.SourcesDirectory)/PlaywrightInit.git/playwright-report'
+        targetPath: '$(Build.SourcesDirectory)/PlaywrightInit/playwright-report'
         artifact: 'playwright-report'
         publishLocation: 'pipeline'
